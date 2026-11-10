@@ -18,3 +18,5 @@ informe/generado/*.tex
 cluster/hostfile
 cluster/*.csv
 tools/voz/prueba/
+__pycache__/
+*.pyc
