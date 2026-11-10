@@ -1,0 +1,245 @@
+%% Informe técnico — formato IEEE (IEEEtran). Compilar: latexmk -pdf main.tex   (o subir la carpeta a Overleaf)
+%% Los marcadores en rojo \TODO{...} son datos de TU laboratorio o de TUS mediciones: no se inventan.
+\documentclass[conference]{IEEEtran}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-tabla,es-nodecimaldot]{babel}
+\usepackage{amsmath,amssymb,booktabs,graphicx,xcolor,listings,cite}
+\usepackage{tikz}\usetikzlibrary{positioning,shapes,fit,arrows.meta}
+\usepackage{pgfplots}\pgfplotsset{compat=1.17}
+\usepackage[hidelinks]{hyperref}
+
+\newcommand{\TODO}[1]{\textcolor{red}{\textbf{[#1]}}}
+\newcommand{\pending}[2]{\IfFileExists{generado/#1}{\input{generado/#1}}{#2}}
+
+% --- Valores medidos: los define generado/datos.tex (node informe/results-to-latex.mjs). Mientras no existan, quedan marcadores.
+\newcommand{\AlphaUs}{\TODO{$\alpha$}}\newcommand{\BetaMBps}{\TODO{$\beta$}}
+\newcommand{\SpeedupMax}{\TODO{S}}\newcommand{\EficienciaMax}{\TODO{E}}\newcommand{\ProcMax}{\TODO{p}}
+\newcommand{\TUnoMs}{\TODO{T1}}\newcommand{\KarpFlattMedio}{\TODO{e}}\newcommand{\AmdahlF}{\TODO{f}}
+\newcommand{\AmdahlLimite}{\TODO{1/f}}\newcommand{\GustafsonAlpha}{\TODO{$\alpha_G$}}\newcommand{\GustafsonSMax}{\TODO{$S_G$}}
+\newcommand{\CommPctMax}{\TODO{\%}}\newcommand{\ImbalanceMax}{\TODO{desb.}}\newcommand{\NodosCluster}{\TODO{n}}
+\newcommand{\MuestrasFuerte}{\TODO{N}}\newcommand{\TableroLado}{\TODO{n}}
+\newcommand{\NodeSpeedupMax}{\TODO{S}}\newcommand{\NodeProcMax}{\TODO{p}}
+\IfFileExists{generado/datos.tex}{\input{generado/datos.tex}}{}
+
+\lstset{basicstyle=\ttfamily\scriptsize,frame=single,xleftmargin=2pt,xrightmargin=2pt,breaklines=true,columns=fullflexible,
+  keywordstyle=\bfseries,showstringspaces=false}
+\hyphenation{Open-MPI}
+
+\begin{document}
+\title{C\'omputo paralelo h\'ibrido (MPI + OpenMP) para un motor Monte Carlo en un cl\'uster de PCs de laboratorio: caso Batalla Naval como plataforma did\'actica en Yacuiba, Chaco boliviano}
+\author{\IEEEauthorblockN{Fernando Daniel Cruz Zarate}
+\IEEEauthorblockA{Carrera de Ingenier\'ia Inform\'atica, Universidad Aut\'onoma Juan Misael Saracho (UAJMS)\\
+Yacuiba, Tarija, Bolivia\\ \TODO{correo electr\'onico}}}
+\maketitle
+
+\begin{abstract}
+Se presenta el dise\~no, la implementaci\'on y la evaluaci\'on de un motor de simulaci\'on Monte Carlo paralelo, desarrollado como n\'ucleo de la inteligencia artificial ``Experta'' de un juego de Batalla Naval, y su despliegue sobre un cl\'uster de \NodosCluster{} PCs de laboratorio. El trabajo se sit\'ua en Yacuiba (Chaco boliviano) y propone aprovechar el parque de PCs de escritorio de la universidad como cl\'uster de bajo costo para la ense\~nanza pr\'actica de c\'omputo paralelo y como plataforma de simulaci\'on. El motor se implement\'o en tres capas que producen resultados id\'enticos bit a bit: Node.js (\texttt{worker\_threads}), C con OpenMP y C con MPI + OpenMP (modelo h\'ibrido). El particionamiento es por trozos independientes con semillas derivadas, seguido de una reducci\'on colectiva. Con \ProcMax{} unidades de c\'omputo se midi\'o una aceleraci\'on de \SpeedupMax{}$\times$ (eficiencia de \EficienciaMax{}\,\%), una fracci\'on serial estimada de \AmdahlF{} (Karp--Flatt) y un l\'imite de Amdahl de \AmdahlLimite{}$\times$.
+
+\medskip\noindent\textit{Abstract}---This paper presents the design, implementation and evaluation of a parallel Monte Carlo simulation engine, built as the core of the ``Expert'' AI of a Battleship game and deployed on a cluster of \NodosCluster{} laboratory PCs located in Yacuiba (Bolivian Chaco). The engine is implemented in three layers that yield bit-identical results: Node.js worker threads, C with OpenMP, and C with hybrid MPI + OpenMP. Work is partitioned into independent chunks with derived seeds and combined by a collective reduction. With \ProcMax{} processing units, a speedup of \SpeedupMax{}$\times$ (efficiency \EficienciaMax{}\,\%) was measured, with an estimated serial fraction of \AmdahlF{} (Karp--Flatt) and an Amdahl limit of \AmdahlLimite{}$\times$.
+\end{abstract}
+\begin{IEEEkeywords}
+c\'omputo paralelo, MPI, OpenMP, Monte Carlo, cl\'uster, speedup, ley de Amdahl, Chaco boliviano.
+\end{IEEEkeywords}
+
+%=====================================================================
+\section{Introducci\'on y contextualizaci\'on regional}
+Yacuiba es capital de la provincia Gran Chaco del departamento de Tarija, se encuentra a unos 3\,km de la frontera con Argentina y forma conurbaci\'on con Profesor Salvador Mazza; su econom\'ia se apoya en el comercio fronterizo y en los recursos hidrocarbur\'iferos \cite{bcb2015}. El Censo 2012 registr\'o 91\,998 habitantes en la ciudad \cite{bcb2015} y 147\,478 en la provincia, con un crecimiento provincial de 26,79\,\% entre 2001 y 2012 \cite{ine2014}. La UAJMS mantiene en Yacuiba la Facultad de Ingenier\'ia de Recursos Naturales y Tecnolog\'ia, donde se dicta Ingenier\'ia Inform\'atica \cite{iyarakua2024}, y en la regi\'on se investigan soluciones tecnol\'ogicas para la educaci\'on digital y la automatizaci\'on agr\'icola \cite{choque}.
+
+\textbf{Problema.} La formaci\'on en c\'omputo paralelo requiere practicar con equipos multin\'ucleo y con cl\'usteres, cuyo costo puede ser una barrera cuando no se dispone de infraestructura dedicada. Un laboratorio universitario, en cambio, ya cuenta con PCs de escritorio (Dell OptiPlex) que, interconectadas por una red conmutada, pueden operar como un cl\'uster de bajo costo del tipo Beowulf \cite{sterling1995}. Falta, sin embargo, una aplicaci\'on concreta, reproducible y medible que sirva a la vez como material did\'actico y como banco de pruebas de simulaci\'on. \textbf{Propuesta:} un motor Monte Carlo (estimaci\'on de probabilidades por simulaci\'on, t\'ecnica base del an\'alisis de riesgo \cite{metropolis1949}) integrado a un juego de Batalla Naval que los estudiantes pueden ejecutar, medir y extender.
+
+\textbf{Alcance y limitaciones.} Este trabajo es un prototipo acad\'emico: no se afirma su adopci\'on por ninguna instituci\'on\,\TODO{si existe constancia o acuerdo institucional, citarlo aqu\'i}. Las aplicaciones productivas (por ejemplo, simulaci\'on de riesgo en actividades locales) se presentan como l\'inea de trabajo futura, no como resultados.
+
+\textbf{Contribuciones.} (i)~Un n\'ucleo Monte Carlo con tres implementaciones cuyo resultado es id\'entico para los mismos par\'ametros, lo que permite verificar su correcci\'on y comparar modelos de programaci\'on; (ii)~una arquitectura de dos capas (c\'omputo en hardware directo; aplicaci\'on en contenedores); (iii)~una metodolog\'ia de medici\'on con speedup, eficiencia, Karp--Flatt y escalabilidad fuerte y d\'ebil; (iv)~el c\'odigo y los scripts para reproducir todo el estudio.
+
+%=====================================================================
+\section{Marco te\'orico y estado del arte}
+\subsection{Taxonom\'ia de Flynn}
+Flynn clasifica las arquitecturas seg\'un el n\'umero de flujos de instrucciones y de datos: SISD, SIMD, MISD y MIMD \cite{flynn1966}. El sistema desarrollado es \textbf{MIMD} en su modalidad SPMD: cada hilo o proceso ejecuta el mismo programa, con su propio flujo de control, sobre un trozo distinto de las muestras. Dentro de cada hilo el c\'alculo es secuencial (SISD); no se explota SIMD expl\'icito, de modo que el paralelismo proviene \'unicamente de la descomposici\'on de datos entre flujos independientes.
+
+\subsection{Modelos de memoria}
+En \textbf{memoria compartida} los hilos acceden al mismo espacio de direcciones y se coordinan con barreras o operaciones at\'omicas; OpenMP es el est\'andar de facto en C \cite{dagum1998,openmp52}, y Node.js ofrece un equivalente con \texttt{SharedArrayBuffer} y \texttt{Atomics} \cite{nodejsworker}. En \textbf{memoria distribuida} cada proceso tiene su espacio privado y la cooperaci\'on se hace por paso de mensajes, cuyo est\'andar es MPI \cite{mpi40}. Los PCs de laboratorio son monoprocesador de acceso uniforme a memoria; un cl\'uster de ellos es entonces un sistema \textbf{h\'ibrido}: memoria compartida dentro de cada equipo y distribuida entre equipos, lo que motiva el modelo MPI + OpenMP \cite{pacheco2011,grama2003}.
+
+\subsection{Redes de interconexi\'on}
+Un cl\'uster de PCs se conecta con Ethernet conmutada: topolog\'ia en \textbf{estrella} a trav\'es de un switch, con di\'ametro 2 y una capacidad de bisecci\'on limitada por la velocidad del enlace de cada equipo \cite{grama2003}. El coste de enviar $m$ bytes se modela con la relaci\'on de Hockney \cite{hockney1994}
+\begin{equation}\label{eq:hockney}
+T_{\mathrm{msg}}(m)=\alpha+\frac{m}{\beta},
+\end{equation}
+con latencia $\alpha$ y ancho de banda $\beta$. Una reducci\'on colectiva en \'arbol cuesta aproximadamente $\lceil\log_2 p\rceil\,T_{\mathrm{msg}}(m)$. En este trabajo $m=4n^2$ bytes (un entero por casilla; 1\,600\,B para $n=20$), \emph{independiente del n\'umero de muestras}: se predice por tanto que la comunicaci\'on es despreciable frente al c\'omputo cuando $N$ es grande, hip\'otesis que la secci\'on~V contrasta.
+
+\subsection{Clasificaci\'on del sistema}
+La Tabla~\ref{tab:clasif} resume c\'omo se clasifica cada componente seg\'un Flynn, el modelo de memoria y el medio de comunicaci\'on.
+\begin{table}[t]
+\caption{Clasificaci\'on de los componentes del sistema.}\label{tab:clasif}
+\centering\scriptsize
+\begin{tabular}{@{}llll@{}}
+\toprule
+Componente & Flynn & Memoria & Comunicaci\'on\\\midrule
+Node.js, \texttt{worker\_threads} & MIMD (SPMD) & compartida o privada & \texttt{Atomics} / mensajes\\
+C + OpenMP & MIMD (SPMD) & compartida & variables compartidas\\
+C + MPI + OpenMP & MIMD (SPMD) & h\'ibrida & MPI sobre Ethernet\\
+Nodos de IA (Docker) & MIMD (maestro--trabajadores) & distribuida & HTTP/TCP\\\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{M\'etricas y leyes de rendimiento}
+Con $T_1$ el tiempo de la mejor versi\'on secuencial y $T_p$ el tiempo con $p$ unidades de c\'omputo: aceleraci\'on $S=T_1/T_p$ y eficiencia $E=S/p$. La ley de Amdahl \cite{amdahl1967} acota el \emph{mismo} trabajo con una fracci\'on secuencial $f$:
+\begin{equation}\label{eq:amdahl}
+S(p)=\frac{1}{f+\frac{1-f}{p}}\le\frac{1}{f}.
+\end{equation}
+La de Gustafson \cite{gustafson1988} considera que el trabajo crece con $p$ (escalabilidad d\'ebil), con fracci\'on secuencial escalada $\alpha_G$:
+\begin{equation}\label{eq:gustafson}
+S_G(p)=p-\alpha_G\,(p-1).
+\end{equation}
+La m\'etrica de Karp--Flatt \cite{karpflatt1990} estima $f$ a partir de las mediciones: $e=\dfrac{1/S-1/p}{1-1/p}$. Si $e$ es aproximadamente constante al crecer $p$, la limitaci\'on es una fracci\'on serial fija; si crece, hay sobrecarga que aumenta con $p$ (comunicaci\'on, contenci\'on, desbalance).
+
+\subsection{M\'etodo Monte Carlo}
+Dado el estado de un tablero (aguas, impactos, barcos restantes), se generan $N$ flotas aleatorias compatibles; la probabilidad de que la casilla $i$ contenga un barco se estima como $\hat p_i=\frac{1}{N_v}\sum_{s}\mathbf 1[i\in F_s]$, con $N_v\le N$ las muestras v\'alidas. El error t\'ipico decrece como $O(1/\sqrt{N_v})$ \cite{metropolis1949}, por lo que reducirlo a la mitad cuesta cuadruplicar el c\'omputo: una necesidad real de paralelismo. Las muestras son independientes, lo que hace al problema \emph{embarazosamente paralelo}: solo la reducci\'on final requiere comunicaci\'on.
+
+%=====================================================================
+\section{Dise\~no de la arquitectura e infraestructura}
+\subsection{Visi\'on general}
+La arquitectura (Fig.~\ref{fig:arq}) tiene dos capas. La \textbf{capa de c\'omputo} ejecuta el n\'ucleo MPI + OpenMP directamente sobre el sistema operativo de los equipos, para que la medici\'on no se vea afectada por la virtualizaci\'on. La \textbf{capa de aplicaci\'on} (juego, base de datos y nodos de IA) corre en contenedores y delega el c\'alculo pesado a nodos de IA por HTTP.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[font=\scriptsize,box/.style={draw,rounded corners=2pt,align=center,minimum height=0.95cm,text width=1.62cm,inner sep=2pt}]
+\node[box,fill=gray!15,text width=3.2cm] (sw) {Switch Ethernet\\ \TODO{vel.}};
+\node[box,below left=0.55cm and -0.15cm of sw,fill=blue!10] (n2) {OptiPlex 2\\ rank 1\\ \TODO{n}\,hilos};
+\node[box,left=0.15cm of n2,fill=blue!20] (n1) {OptiPlex 1 (maestro)\\ rank 0\\ \TODO{n}\,hilos};
+\node[box,right=0.15cm of n2,fill=blue!10] (n3) {OptiPlex 3\\ rank 2\\ \TODO{n}\,hilos};
+\node[box,right=0.15cm of n3,fill=blue!10] (n4) {OptiPlex 4\\ rank 3\\ \TODO{n}\,hilos};
+\foreach \n in {n1,n2,n3,n4} \draw (sw.south) -- (\n.north);
+\node[draw,dashed,rounded corners=2pt,fit=(n1)(n4),inner sep=4pt,label={[font=\scriptsize]below:Capa de c\'omputo: MPI entre equipos + OpenMP dentro de cada uno (hardware directo)}] (cc) {};
+\node[box,below=1.05cm of n1,text width=3.7cm,fill=green!12] (app) {Capa de aplicaci\'on (Docker en el maestro):\\ backend Node, PostgreSQL, frontend};
+\node[box,right=0.3cm of app,text width=3.7cm,fill=green!12] (ai) {Nodos de IA (contenedores)\\ $\times N$, HTTP + token};
+\draw[-{Stealth}] (app) -- (ai);
+\end{tikzpicture}
+\caption{Arquitectura del cl\'uster. El n\'umero de equipos, hilos por equipo y la velocidad de la red se completan con el hardware real.}\label{fig:arq}
+\end{figure}
+
+\subsection{Cl\'uster f\'isico y asignaci\'on de CPU y RAM}
+La Tabla~\ref{tab:hw} resume los equipos. Se asigna \textbf{un proceso MPI por equipo} y tantos hilos OpenMP como n\'ucleos f\'isicos: as\'i la red solo transporta un mensaje por equipo en la reducci\'on y la memoria compartida se aprovecha localmente. La memoria no es el factor limitante: el pico de memoria residente medido para un proceso en un tablero de $20\times20$ fue de 10,8\,MB (entorno de desarrollo), muy inferior a la RAM de cualquier OptiPlex.
+
+\begin{table}[t]
+\caption{Equipos del cl\'uster (completar con \texttt{lscpu}, \texttt{free -h}, \texttt{ethtool}).}\label{tab:hw}
+\centering\scriptsize
+\begin{tabular}{@{}llccl@{}}
+\toprule
+Equipo & CPU & N\'uc./hilos & RAM & Rol\\\midrule
+OptiPlex 1 & \TODO{modelo} & \TODO{n/h} & \TODO{GB} & maestro, rank 0, Docker\\
+OptiPlex 2 & \TODO{modelo} & \TODO{n/h} & \TODO{GB} & rank 1\\
+OptiPlex 3 & \TODO{modelo} & \TODO{n/h} & \TODO{GB} & rank 2\\
+OptiPlex 4 & \TODO{modelo} & \TODO{n/h} & \TODO{GB} & rank 3\\\bottomrule
+\end{tabular}\\[2pt]
+{\scriptsize Red: switch \TODO{marca/modelo}, enlaces \TODO{Mb/s}; SO \TODO{distribuci\'on}; gcc \TODO{ver.}; OpenMPI \TODO{ver.}; Node.js 22.}
+\end{table}
+
+\subsection{Configuraci\'on de contenedores}
+La aplicaci\'on se despliega con \texttt{docker compose}: servicios \texttt{db} (PostgreSQL), \texttt{backend}, \texttt{frontend} y, con el perfil \texttt{distributed}, \texttt{ai-node} escalable (\texttt{--scale ai-node=N}). Los nodos de IA no publican puertos (solo son alcanzables por la red interna), exigen un token compartido, validan y acotan cada campo recibido, y se limitan en CPU y memoria con \texttt{deploy.resources.limits}; si ning\'un nodo responde, el backend calcula con sus propios hilos (respaldo local).
+\begin{lstlisting}[language=bash]
+docker compose --profile distributed \
+  up --build --scale ai-node=3
+# .env: AI_NODES=http://<nodo>:5001,...
+#       AI_NODE_TOKEN=<secreto>
+\end{lstlisting}
+
+%=====================================================================
+\section{Implementaci\'on algor\'itmica paralela}
+\subsection{Algoritmo y particionamiento de datos}
+Para cada muestra se colocan los barcos restantes, de mayor a menor, eligiendo al azar una posici\'on legal que no solape a las ya puestas; si quedan impactos sin cubrir se sesga la elecci\'on hacia posiciones que los cubran (90\,\%), y la muestra se descarta si no los cubre todos. Las casillas ocupadas acumulan un contador. Las $N$ muestras se parten en $P=r\cdot t$ \textbf{trozos} ($r$ procesos MPI, $t$ hilos por proceso); el trozo $k$ recibe $\lfloor N/P\rfloor+[k<N\bmod P]$ muestras y la semilla $\mathrm{seed}+(k+1)\cdot\texttt{0x9E3779B1}$. Como el trozo $k$ es el mismo cualquiera sea el reparto en procesos e hilos, \emph{el resultado depende solo de $(N,P,\mathrm{seed})$ y no de la topolog\'ia}: esto es lo que permite verificar la correcci\'on comparando una suma de control.
+
+\subsection{OpenMP: hilos dentro de un equipo}
+Cada trozo es una iteraci\'on de un \texttt{parallel for}; cada hilo acumula en un arreglo local y lo vuelca una sola vez al arreglo compartido con \texttt{atomic}, de modo que hay pocas escrituras compartidas y se evita la contenci\'on y el \emph{false sharing}.
+\begin{lstlisting}[language=C]
+#pragma omp parallel for schedule(static,1) \
+        num_threads(T) reduction(+:total_acc)
+for (int i = 0; i < count; i++) {
+  int k = first + i;               /* trozo global */
+  sample_density(..., chunk(k), chunk_seed(seed,k), local, &acc);
+  for (int j = 0; j < n; j++) if (local[j]) {
+    #pragma omp atomic
+    density[j] += local[j];
+  }
+  total_acc += acc;
+}
+\end{lstlisting}
+
+\subsection{MPI: procesos entre equipos}
+\texttt{MPI\_Init\_thread} con \texttt{MPI\_THREAD\_FUNNELED} (solo el hilo principal invoca MPI); \texttt{MPI\_Comm\_rank/size} para ubicar el proceso; el proceso $r$ calcula los trozos $[rt,(r+1)t)$; \texttt{MPI\_Barrier} y \texttt{MPI\_Wtime} delimitan la medici\'on; \texttt{MPI\_Reduce} (\texttt{MPI\_SUM}) suma las densidades parciales y las muestras v\'alidas en el proceso 0; reducciones con \texttt{MPI\_MAX} y \texttt{MPI\_SUM} de los tiempos dan el c\'omputo del proceso m\'as lento y el desbalance $\max/\mathrm{media}$; y \texttt{MPI\_Gather} recoge los nombres de equipo para contar los nodos f\'isicos. Se miden por separado el c\'omputo y la comunicaci\'on (la reducci\'on), con $T_p=T_{\mathrm{c\acute{o}mputo}}+T_{\mathrm{com}}$.
+
+\subsection{Balanceo de carga y tolerancia a fallos}
+En el n\'ucleo en C el reparto es \textbf{est\'atico}, adecuado porque los trozos tienen igual n\'umero de muestras independientes y el cl\'uster es homog\'eneo; el desbalance medido ($\max/$media del c\'omputo) lo cuantifica. En la capa de aplicaci\'on (Node.js) el balanceo es \textbf{din\'amico}: los hilos toman tareas de una cola compartida apenas quedan libres, con dos prioridades (partidas en vivo antes que torneos), y el coordinador asigna cada tarea al nodo de menor carga relativa (tareas en vuelo entre hilos). Si un nodo falla se le marca ca\'ido unos segundos y la tarea se reintenta en otro; es seguro porque las tareas son \emph{idempotentes} (la semilla fija el resultado). Con cola larga la IA reduce sus muestras (contrapresi\'on) y las tareas se cancelan cuando el jugador abandona la sala.
+
+\subsection{Verificaci\'on de correcci\'on}
+Para varios tableros ($10$, $12$ y $20$), tama\~nos de muestra y n\'umeros de trozos (1 a 5), las versiones Node.js, C + OpenMP y C + MPI + OpenMP (p.\,ej. 2 procesos $\times$ 2 hilos y 3 procesos $\times$ 1 hilo) produjeron el mismo n\'umero de muestras v\'alidas y la misma suma de control de la densidad. El repositorio incluye pruebas automatizadas (93 en el backend) que verifican, adem\'as, que los modos de comunicaci\'on por mensajes y por memoria compartida coinciden y que el resultado distribuido por red coincide con el local.
+
+%=====================================================================
+\section{Resultados experimentales y an\'alisis de rendimiento}
+\subsection{Metodolog\'ia}
+Escena de referencia: tablero de $\TableroLado\times\TableroLado$ con dos impactos adyacentes y cuatro casillas de agua, $N=\MuestrasFuerte$ muestras. Cada punto es la \textbf{mediana} de varias repeticiones tras una de calentamiento; $T_1$ es la ejecuci\'on de 1 proceso $\times$ 1 hilo (\TUnoMs\,ms). Una configuraci\'on es \emph{equipos/procesos/hilos} y $p=r\cdot t$. Los equipos no ejecutaron otras tareas durante la medici\'on. La red se caracteriz\'o con un ping-pong MPI: $\alpha=\AlphaUs\,\mu$s y $\beta=\BetaMBps$\,MB/s (Ec.~\ref{eq:hockney}).
+
+\subsection{Escalabilidad fuerte}
+\begin{table}[t]
+\caption{Escalabilidad fuerte (mismo trabajo): tiempo, aceleraci\'on, eficiencia, porcentaje de comunicaci\'on y desbalance.}\label{tab:fuerte}
+\centering\scriptsize
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+Config. & $p$ & $T_p$ (ms) & $S$ & $E$ (\%) & Com. (\%) & Desb.\\\midrule
+\pending{tabla_fuerte.tex}{\TODO{pendiente de medici\'on} & & & & & &}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\IfFileExists{generado/fig_speedup.tex}{%
+\begin{tikzpicture}\begin{axis}[width=0.95\columnwidth,height=5.3cm,xlabel={Unidades de c\'omputo $p$},ylabel={Aceleraci\'on $S$},grid=both,legend pos=north west,legend style={font=\scriptsize},tick label style={font=\scriptsize},label style={font=\footnotesize},xmin=1,ymin=0]
+\input{generado/fig_speedup.tex}
+\end{axis}\end{tikzpicture}}{\fbox{\parbox{0.9\columnwidth}{\centering\vspace{1.6cm}\TODO{figura pendiente de medici\'on}\vspace{1.6cm}}}}
+\caption{Aceleraci\'on medida frente al ideal y al modelo de Amdahl (Ec.~\ref{eq:amdahl}) con $f$ estimada por Karp--Flatt.}\label{fig:speedup}
+\end{figure}
+
+\subsection{Escalabilidad d\'ebil y Gustafson}
+\begin{table}[t]
+\caption{Escalabilidad d\'ebil (trabajo proporcional a $p$). $S_{esc}=p\,T_1/T_p$; $S_G$ es el modelo de la Ec.~\ref{eq:gustafson}.}\label{tab:debil}
+\centering\scriptsize
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+Config. & $p$ & $N$ & $T_p$ (ms) & $E_d$ (\%) & $S_{esc}$ & $S_G$\\\midrule
+\pending{tabla_debil.tex}{\TODO{pendiente de medici\'on} & & & & & &}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\IfFileExists{generado/fig_eficiencia.tex}{%
+\begin{tikzpicture}\begin{axis}[width=0.95\columnwidth,height=5cm,xlabel={Unidades de c\'omputo $p$},ylabel={Eficiencia (\%)},grid=both,legend pos=south west,legend style={font=\scriptsize},tick label style={font=\scriptsize},label style={font=\footnotesize},xmin=1,ymin=0]
+\input{generado/fig_eficiencia.tex}
+\end{axis}\end{tikzpicture}}{\fbox{\parbox{0.9\columnwidth}{\centering\vspace{1.4cm}\TODO{figura pendiente de medici\'on}\vspace{1.4cm}}}}
+\caption{Eficiencia en escalabilidad fuerte y d\'ebil.}\label{fig:efic}
+\end{figure}
+
+\subsection{Validaci\'on de las leyes de Amdahl y Gustafson}
+La fracci\'on secuencial estimada con Karp--Flatt es $f=\AmdahlF$, que por la Ec.~\ref{eq:amdahl} implica una aceleraci\'on m\'axima de \AmdahlLimite{}$\times$ para este trabajo; la mayor medida fue \SpeedupMax{}$\times$ con $p=\ProcMax$. En escalabilidad d\'ebil, la fracci\'on secuencial escalada es $\alpha_G=\GustafsonAlpha$ y la aceleraci\'on escalada m\'axima, \GustafsonSMax{}$\times$ (Ec.~\ref{eq:gustafson}). \TODO{Comparar: \textquestiondown el modelo de Amdahl reproduce la curva medida? \textquestiondown $e$ es constante o crece con $p$? Explicar las desviaciones.}
+
+\subsection{An\'alisis de cuellos de botella}
+\textbf{Comunicaci\'on.} El mensaje de la reducci\'on mide $4n^2$ bytes, independiente de $N$; la comunicaci\'on represent\'o como m\'aximo \CommPctMax\,\% del tiempo total. \TODO{Contrastar con el modelo $\lceil\log_2 p\rceil(\alpha+m/\beta)$ y explicar si crece con el n\'umero de equipos.}
+\textbf{Desbalance.} El cociente m\'aximo/media del c\'omputo fue como m\'aximo \ImbalanceMax. \TODO{Explicar causas: procesos del sistema, frecuencia de CPU, equipos distintos.}
+\textbf{Memoria.} El pico residente (10,8\,MB por proceso) indica que el problema est\'a limitado por c\'omputo y por la cach\'e, no por la capacidad de RAM. \TODO{Si se mide $p$ mayor que los n\'ucleos f\'isicos, discutir el efecto de hyper-threading y del ancho de banda de memoria.}
+
+\subsection{Capa de aplicaci\'on (Node.js)}
+Con \texttt{worker\_threads} la mejor aceleraci\'on fue \NodeSpeedupMax{}$\times$ con \NodeProcMax{} hilos. Las tareas muy peque\~nas (IA ``dif\'icil'', microsegundos) no se benefician de repartirse: el experimento de granularidad lo comprueba y el sistema las calcula en el hilo principal. \TODO{Resumir \texttt{npm run latency} (retraso del event loop) y \texttt{npm run load} (partidas por segundo) si se miden.}
+
+%=====================================================================
+\section{Conclusiones e impacto social y productivo}
+Se dise\~n\'o e implement\'o un motor Monte Carlo paralelo con tres implementaciones verificadas entre s\'i y una arquitectura de dos capas reproducible sobre PCs de laboratorio. La descomposici\'on en trozos independientes con semillas derivadas hace que el resultado no dependa de la topolog\'ia, lo que simplifica la validaci\'on y la ense\~nanza. \TODO{Concluir con los n\'umeros medidos: aceleraci\'on, eficiencia, validez de Amdahl/Gustafson y cuello de botella dominante.}
+
+\textbf{Impacto social.} El proyecto ofrece a la carrera de Ingenier\'ia Inform\'atica un material pr\'actico y de c\'odigo abierto para ense\~nar y medir c\'omputo paralelo con equipos que la universidad ya posee, y un banco de pruebas para trabajos de estudiantes. \textbf{Impacto productivo (potencial).} La simulaci\'on Monte Carlo es una t\'ecnica general de an\'alisis de riesgo y estimaci\'on; un cl\'uster local permitir\'ia resolver simulaciones de ese tipo sin depender de infraestructura externa. Esta aplicaci\'on no se ha evaluado en este trabajo.
+
+\textbf{Limitaciones y trabajo futuro.} La IA ``Experta'' no supera en calidad de juego a la ``Dif\'icil'': su valor es ser una carga pesada y divisible para estudiar el paralelismo. Quedan pendientes la distribuci\'on de las salas de juego entre varias instancias (Redis), la comparaci\'on con MPI en m\'as nodos y una carga de trabajo directamente regional con datos reales.
+
+\bibliographystyle{IEEEtran}
+\bibliography{refs}
+\end{document}

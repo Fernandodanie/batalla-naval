@@ -1,0 +1,130 @@
+// Esquema de datos de Batalla Naval (PostgreSQL).
+// Después de cambiarlo:  npx prisma migrate dev --name <descripcion>
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MatchMode {
+  PVP // persona contra persona
+  AI  // persona contra la IA
+}
+
+enum Side {
+  A
+  B
+}
+
+/// Cuenta de jugador + sus estadísticas acumuladas.
+model User {
+  id            String   @id @default(cuid())
+  email         String?  @unique // en minúsculas; opcional solo para cuentas previas a la migración
+  username      String // como lo escribió la persona (se muestra tal cual)
+  usernameLower String   @unique // para que "Ana" y "ana" no sean dos cuentas
+  passwordHash  String
+  avatar        String   @default("")
+
+  points      Int @default(0) // puntaje acumulado: ordena el ranking, nunca baja
+  rating      Int @default(1000) // Elo, solo cambia en PvP entre cuentas registradas
+  wins        Int @default(0)
+  losses      Int @default(0)
+  gamesPlayed Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  matches MatchPlayer[]
+  campaignProgress  CampaignProgress[]
+  achievementUnlocks AchievementUnlock[]
+  quizResults        QuizResult[]
+
+  @@index([points])
+}
+
+/// Una partida terminada.
+model Match {
+  id         String    @id @default(cuid())
+  mode       MatchMode
+  difficulty String? // solo cuando mode = AI: easy | normal | hard | expert | expert
+  boardSize  Int
+  biome      String    @default("water") // water | pirate | land | jungle
+  winnerSide Side
+  reason     String // flota_hundida | abandono | tiempo
+  ranked     Boolean   @default(false)
+  startedAt  DateTime
+  endedAt    DateTime  @default(now())
+
+  players MatchPlayer[]
+
+  @@index([endedAt])
+}
+
+/// Cada lado de una partida (siempre hay dos). userId es null para invitados e IA.
+model MatchPlayer {
+  id          String  @id @default(cuid())
+  matchId     String
+  match       Match   @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  side        Side
+  userId      String?
+  user        User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  displayName String
+  isAi        Boolean @default(false)
+  won         Boolean
+  shots       Int
+  hits        Int
+  points      Int
+  ratingDelta Int     @default(0)
+
+  @@unique([matchId, side])
+  @@index([userId])
+}
+
+/// Mejor resultado de una misión de campaña por cuenta. Una fila por (usuario, campaña, misión).
+model CampaignProgress {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaignId String // chaco | siglo19 | corso | litoral
+  missionId  Int // número de la misión dentro de la campaña (1, 2, ...)
+  stars      Int // 1 a 3: la mejor marca
+  bestShots  Int // menos disparos con los que se ganó
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, campaignId, missionId])
+  @@index([userId])
+}
+
+/// Mejor resultado del cuestionario (modo aula) de una misión, por cuenta. Las preguntas viven en el código (content/).
+model QuizResult {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaignId  String
+  missionId   Int
+  bestCorrect Int // mejor número de respuestas correctas
+  total       Int // preguntas de la misión cuando se contestó
+  attempts    Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, campaignId, missionId])
+  @@index([userId])
+}
+
+/// Logro desbloqueado por una cuenta (el catálogo vive en el código: domain/achievements.js).
+model AchievementUnlock {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId String
+  unlockedAt    DateTime @default(now())
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+}

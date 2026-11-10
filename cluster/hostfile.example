@@ -1,0 +1,7 @@
+# Copia este archivo a "hostfile" y pon los nombres o IPs de tus PCs (una línea por equipo).
+# slots = cuántos procesos MPI admite ese equipo (con el modelo híbrido: 1 por equipo y los hilos OpenMP usan sus núcleos).
+# Usa nombres o IPs FIJAS (reserva en el router/DHCP) para que no cambien entre experimentos.
+optiplex-01 slots=1
+optiplex-02 slots=1
+optiplex-03 slots=1
+optiplex-04 slots=1

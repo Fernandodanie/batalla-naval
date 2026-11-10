@@ -1,0 +1,13 @@
+{
+  "name": "batalla-naval-frontend",
+  "version": "0.9.0",
+  "private": true,
+  "type": "module",
+  "description": "Frontend estático (HTML + JS ES modules, sin paso de compilación). En producción lo sirve nginx.",
+  "scripts": {
+    "test": "node --test --test-concurrency=1 \"test/**/*.test.js\""
+  },
+  "devDependencies": {
+    "jsdom": "^26.0.0"
+  }
+}

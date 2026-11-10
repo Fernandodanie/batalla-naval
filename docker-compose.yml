@@ -1,0 +1,76 @@
+name: batalla-naval
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-naval}
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD - ejecuta node scripts/init-env.mjs}"
+      POSTGRES_DB: ${POSTGRES_DB:-naval}
+    ports:
+      - "127.0.0.1:${DB_PORT:-5432}:5432"   # solo tu PC: para Prisma Studio y para crear migraciones
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-naval}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-naval}?schema=public"
+      JWT_SECRET: "${JWT_SECRET:?Falta JWT_SECRET - ejecuta node scripts/init-env.mjs}"
+      AI_WORKERS: ${AI_WORKERS:-}
+      MC_SAMPLES: ${MC_SAMPLES:-20000}
+      MC_MODE: ${MC_MODE:-shared}
+      PARALLEL_MIN_COST: ${PARALLEL_MIN_COST:-100000}
+      AI_NODES: ${AI_NODES:-}                 # nodos de IA remotos (perfil "distributed"), separados por comas
+      AI_NODE_TOKEN: ${AI_NODE_TOKEN:-}
+      GUEST_AI_DAILY: ${GUEST_AI_DAILY:-10}
+      TURN_SECONDS: ${TURN_SECONDS:-30}
+      PLACEMENT_SECONDS: ${PLACEMENT_SECONDS:-90}
+    expose:
+      - "4000"          # solo visible dentro de la red de Docker; el público entra por el frontend
+
+  # --- IA distribuida (opcional) ---------------------------------------------------------------
+  # Nodos de cálculo: cada uno recibe tareas por HTTP y las reparte entre SUS hilos.
+  #   docker compose --profile distributed up --build --scale ai-node=3
+  # y en .env:  AI_NODES=http://batalla-naval-ai-node-1:5001,http://batalla-naval-ai-node-2:5001,http://batalla-naval-ai-node-3:5001
+  #             AI_NODE_TOKEN=<secreto>   (node scripts/init-env.mjs lo genera)
+  # Si ningún nodo responde, el backend calcula con sus propios hilos (respaldo local).
+  ai-node:
+    profiles: ["distributed"]
+    build: ./backend
+    restart: unless-stopped
+    entrypoint: ["/sbin/tini", "--"]        # sin el docker-entrypoint.sh del backend (no hay base de datos aquí)
+    command: ["node", "src/ai/node-main.js"]
+    environment:
+      AI_NODE_PORT: 5001
+      AI_NODE_HOST: 0.0.0.0                 # solo alcanzable dentro de la red de Docker (no se publica ningún puerto)
+      AI_NODE_TOKEN: "${AI_NODE_TOKEN:?Falta AI_NODE_TOKEN - ejecuta node scripts/init-env.mjs}"
+      AI_NODE_WORKERS: ${AI_NODE_WORKERS:-2}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- --header=\"Authorization: Bearer $${AI_NODE_TOKEN}\" http://127.0.0.1:5001/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${WEB_PORT:-8080}:80"
+
+volumes:
+  db-data:

@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f2f6fb" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1a33" media="(prefers-color-scheme: dark)">
+  <title>Batalla Naval</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232257d8'/%3E%3Cpath d='M16 6v14M10 11h12M7 18c1 5 4 8 9 8s8-3 9-8' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="img/icon-192.png">
+  <link rel="preload" href="fonts/bricolage.woff2" as="font" type="font/woff2" crossorigin>
+  <script src="js/theme.js"></script>
+  <link rel="preload" href="fonts/silkscreen-bold.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/pulido-visual.css">
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <!-- Fondos por contexto (inicio, campañas y cada escenario de partida): main.js solo cambia body[data-bg]; ver «scene-bg» en css/style.css -->
+  <div id="scene-bg" aria-hidden="true">
+    <div class="scene bg-inicio"></div><div class="scene bg-agua"></div><div class="scene bg-tierra"></div><div class="scene bg-selva"></div><div class="scene bg-corsarios"></div>
+  </div>
+  <a class="skip" href="#main">Ir al contenido</a>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <main id="main">
+    <!-- ================= Entrada (sin sesión ni invitado solo se ve esta pantalla) ================= -->
+    <section id="screen-welcome" class="screen" hidden aria-labelledby="welcome-title">
+      <div id="login-bg" class="login-bg" aria-hidden="true"></div>
+
+      <button class="login-sound js-sound" type="button" aria-label="Música y sonido" aria-pressed="true">
+        <svg class="ico-on" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.6L12 18.5v-13L7.6 9.5H4z"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></svg>
+        <svg class="ico-off" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.6L12 18.5v-13L7.6 9.5H4z"/><path d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
+      </button>
+
+      <header class="brand">
+        <p class="welcome-kicker">Comando naval · tiempo real</p>
+        <h1 id="welcome-title">Batalla Naval</h1>
+        <p class="lead">Hunde la flota rival, contra otra persona o contra la IA.</p>
+      </header>
+
+      <div class="welcome-grid">
+        <section class="login-card" aria-labelledby="auth-title">
+          <form id="auth-form" autocomplete="on" novalidate>
+            <h2 id="auth-title">Iniciar sesión</h2>
+            <p class="login-sub">Guarda tu rango, campañas, láminas y logros.</p>
+
+            <div class="field">
+              <label for="auth-email">Correo electrónico</label>
+              <input id="auth-email" name="email" type="email" maxlength="254" autocomplete="email" placeholder="tu@correo.com" aria-describedby="auth-email-error" required>
+              <small id="auth-email-error" class="field-error error small" role="alert" hidden></small>
+            </div>
+
+            <div id="auth-user-field" class="field" hidden>
+              <label for="auth-user">Nombre para mostrar</label>
+              <input id="auth-user" name="username" type="text" maxlength="16" autocomplete="nickname" placeholder="Por ejemplo, Capitana_7" aria-describedby="auth-user-hint auth-user-error">
+              <small id="auth-user-hint" class="muted small">3 a 16 caracteres (letras, números y _). Se muestra en la partida y el ranking.</small>
+              <small id="auth-user-error" class="field-error error small" role="alert" hidden></small>
+            </div>
+
+            <div class="field">
+              <label for="auth-pass">Contraseña</label>
+              <div class="pass-row">
+                <input id="auth-pass" name="password" type="password" maxlength="72" autocomplete="current-password" aria-describedby="auth-pass-hint auth-pass-error" required>
+                <button id="auth-pass-toggle" class="btn ghost small" type="button" aria-label="Mostrar contraseña" aria-pressed="false" aria-controls="auth-pass">Mostrar</button>
+              </div>
+              <small id="auth-pass-hint" class="muted small" hidden>Mínimo 8 caracteres.</small>
+              <small id="auth-pass-error" class="field-error error small" role="alert" hidden></small>
+            </div>
+
+            <div id="auth-avatar-field" class="field" hidden>
+              <span id="auth-avatar-label">Avatar</span>
+              <div id="auth-avatars" class="avatars" role="radiogroup" aria-labelledby="auth-avatar-label"></div>
+            </div>
+
+            <p id="auth-error" class="error small" role="alert" hidden></p>
+
+            <div class="row wrap welcome-actions">
+              <button id="auth-submit" class="btn primary" type="submit">Entrar</button>
+              <button id="auth-cancel" class="btn ghost" type="button" hidden>Volver al juego</button>
+            </div>
+
+            <p class="welcome-switch-row">
+              <button id="auth-switch" class="linklike" type="button"></button>
+            </p>
+          </form>
+
+          <div class="login-or" aria-hidden="true"><span>o</span></div>
+
+          <div class="login-guest">
+            <button id="btn-guest" class="btn wide" type="button" aria-expanded="false" aria-controls="guest-form">Jugar como invitado</button>
+            <p class="login-note">Como invitado tus puntos no se guardan y hay un límite diario de partidas contra la IA.</p>
+
+            <form id="guest-form" hidden novalidate>
+              <div class="field">
+                <label for="guest-name">Nombre de invitado</label>
+                <input id="guest-name" name="guest-name" type="text" maxlength="16" placeholder="Por ejemplo, Ana" autocomplete="nickname" aria-describedby="guest-name-error" required>
+                <small id="guest-name-error" class="field-error error small" role="alert" hidden></small>
+              </div>
+              <div class="field">
+                <span id="guest-avatar-label">Avatar</span>
+                <div id="guest-avatars" class="avatars" role="radiogroup" aria-labelledby="guest-avatar-label"></div>
+              </div>
+              <button id="guest-submit" class="btn primary wide" type="submit">Entrar como invitado</button>
+            </form>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <!-- ================= Inicio (con cuenta o como invitado): tres pestañas ================= -->
+    <section id="screen-home" class="screen" hidden aria-labelledby="title">
+      <header class="player-bar" aria-label="Quién juega">
+        <h1 id="title" class="hub-logo" tabindex="-1">Batalla Naval</h1>
+        <div class="player-who">
+          <span id="player-avatar" class="avatar"></span>
+          <div class="player-info">
+            <strong id="player-name"></strong> <span id="player-kind" class="tag" hidden>invitado</span>
+            <div id="player-stats" class="muted small"></div>
+          </div>
+        </div>
+        <div class="row wrap player-actions">
+          <button id="btn-upgrade" class="btn small" type="button" hidden>Iniciar sesión / Crear cuenta</button>
+          <button class="btn ghost small js-settings" type="button">Ajustes</button>
+          <button id="btn-logout" class="btn ghost small" type="button">Salir</button>
+        </div>
+      </header>
+
+      <nav class="hub-tabs" role="tablist" aria-label="Secciones">
+        <button id="tab-salas" class="hub-tab" role="tab" type="button" data-tab="salas" aria-selected="true" aria-controls="pane-salas">Salas y ranking</button>
+        <button id="tab-jugar" class="hub-tab" role="tab" type="button" data-tab="jugar" aria-selected="false" aria-controls="pane-jugar" tabindex="-1">Crear o unirse</button>
+        <button id="tab-campanas" class="hub-tab" role="tab" type="button" data-tab="campanas" aria-selected="false" aria-controls="pane-campanas" tabindex="-1">Campañas</button>
+      </nav>
+
+      <!-- 1 · Salas públicas y ranking -->
+      <section id="pane-salas" class="hub-pane" role="tabpanel" aria-labelledby="tab-salas">
+        <div class="hub-cols">
+          <section class="sheet" aria-labelledby="rooms-title">
+            <div class="head-row"><h2 id="rooms-title">Salas públicas</h2>
+              <button id="btn-refresh" class="btn ghost small" type="button">Actualizar</button></div>
+            <ul id="rooms" class="rooms"></ul>
+          </section>
+
+          <section class="sheet" aria-labelledby="rank-title">
+            <h2 id="rank-title">Ranking</h2>
+            <ol id="leaderboard" class="ranking"></ol>
+          </section>
+        </div>
+      </section>
+
+      <!-- 2 · Crear una sala o entrar con código -->
+      <section id="pane-jugar" class="hub-pane" role="tabpanel" aria-labelledby="tab-jugar" hidden>
+        <div class="hub-cols hub-cols-play">
+          <section class="sheet" aria-labelledby="create-title">
+            <h2 id="create-title">Crear partida</h2>
+            <form id="create-form">
+              <div class="seg" role="radiogroup" aria-label="Contra quién jugar">
+                <label><input type="radio" name="mode" value="pvp" checked><span>Contra una persona</span></label>
+                <label><input type="radio" name="mode" value="ai"><span>Contra la IA</span></label>
+              </div>
+              <label class="field"><span>Escenario</span><select id="biome"></select></label>
+              <label class="field"><span>Tablero</span><select id="size"></select></label>
+              <label class="field" id="difficulty-field" hidden><span>Dificultad de la IA</span>
+                <select id="difficulty">
+                  <option value="easy">Fácil (dispara al azar)</option>
+                  <option value="normal" selected>Normal (caza y remata)</option>
+                  <option value="hard">Difícil (calcula probabilidades)</option>
+                  <option value="expert">Experta (Monte Carlo en paralelo)</option>
+                </select></label>
+              <label class="check" id="opt-public-row"><input type="checkbox" id="opt-public" checked> Sala pública (aparece en la lista)</label>
+              <label class="check"><input type="checkbox" id="opt-hit"> Acertar da otro disparo</label>
+              <button id="btn-create" class="btn primary wide" type="submit">Crear sala</button>
+            </form>
+          </section>
+
+          <section class="sheet" aria-labelledby="join-title">
+            <h2 id="join-title">Entrar con código</h2>
+            <p class="muted small">¿Te pasaron un código de 4 letras? Escríbelo para jugar o para mirar la partida.</p>
+            <p id="invite" class="invite" hidden></p>
+            <form id="join-form" class="row">
+              <input id="join-code" class="code" maxlength="4" placeholder="ABCD" autocapitalize="characters" autocomplete="off" aria-label="Código de sala">
+              <button class="btn primary" type="submit">Jugar</button>
+              <button id="btn-spectate" class="btn" type="button">Mirar</button>
+            </form>
+          </section>
+        </div>
+      </section>
+
+      <!-- 3 · Campañas -->
+      <section id="pane-campanas" class="hub-pane" role="tabpanel" aria-labelledby="tab-campanas" hidden>
+        <div class="camp-head">
+          <div>
+            <h2 id="camp-title">Campañas</h2>
+            <p class="muted">Misiones históricas y de ficción contra la IA, con estrellas y logros.</p>
+            <p id="camp-summary" class="muted small"></p>
+          </div>
+          <div class="row wrap">
+            <button id="btn-achievements" class="btn" type="button">🏆 Logros</button>
+            <button id="btn-gallery" class="btn" type="button">🖼️ Láminas</button>
+          </div>
+        </div>
+        <div id="camp-tab-list"></div>
+      </section>
+
+      <footer class="foot">
+        <span class="js-conn conn" data-s="connecting">Conectando…</span>
+        <button class="btn ghost small js-sound" type="button" aria-label="Sonido">🔊</button>
+      </footer>
+    </section>
+
+    <!-- ================= Campañas ================= -->
+    <section id="screen-campaign" class="screen" hidden aria-labelledby="camp-screen-title">
+      <header class="topbar">
+        <button id="camp-back" class="btn small" type="button">← Volver</button>
+        <h2 id="camp-screen-title">Campañas</h2>
+        <button id="camp-gallery" class="btn ghost small" type="button">🖼️ Láminas</button>
+        <span id="camp-quota" class="muted small"></span>
+      </header>
+      <div id="camp-body"></div>
+    </section>
+
+    <!-- ================= Partida ================= -->
+    <section id="screen-game" class="screen" hidden aria-label="Partida">
+      <header class="topbar">
+        <div class="room-chip"><span class="muted">Sala</span> <strong id="room-code"></strong>
+          <button id="btn-copy" class="btn ghost small" type="button">Copiar enlace</button>
+          <span id="spectators" class="muted small" hidden></span></div>
+        <div class="top-actions">
+          <span class="js-conn conn" data-s="connecting"></span>
+          <button class="btn ghost small js-sound" type="button" aria-label="Sonido">🔊</button>
+          <button class="btn ghost small js-settings" type="button">Ajustes</button>
+          <button id="btn-leave" class="btn small" type="button">Salir</button>
+        </div>
+      </header>
+
+      <div id="players" class="players"></div>
+      <div class="status-row">
+        <p id="banner" class="banner" role="status" aria-live="polite"></p>
+        <span id="timer" class="timer" hidden></span>
+      </div>
+
+      <div id="mission-bar" class="mission-bar" hidden></div>
+
+      <aside id="narrator" class="narrator" hidden aria-label="Narración de la misión">
+        <div id="n-avatar" class="n-avatar" aria-hidden="true"></div>
+        <p id="n-meta" class="n-meta muted small"></p>
+        <ul id="n-log" class="n-log" aria-hidden="true"></ul>
+        <p id="n-text" class="n-text" aria-hidden="true"></p>
+        <p id="n-sr" class="sr-only" role="status" aria-live="polite"></p>
+        <div class="row">
+          <button id="n-facts" class="btn ghost small" type="button">Datos y fuentes</button>
+          <button id="n-close" class="btn ghost small" type="button" aria-label="Ocultar la narración">×</button>
+        </div>
+      </aside>
+
+      <section id="panel-waiting" class="sheet center" hidden>
+        <h2>Esperando a tu rival</h2>
+        <p class="muted">Comparte el código de la sala o pulsa “Copiar enlace” y envíalo por mensaje. También pueden entrar a mirar.</p>
+      </section>
+
+      <section id="panel-placing" class="sheet" hidden aria-label="Colocar flota">
+        <div class="place-grid">
+          <div id="board-place" class="board-wrap"></div>
+          <div class="place-side">
+            <h2 id="fleet-title">Tu flota</h2>
+            <p class="muted small">Arrastra una unidad desde la lista o mueve las ya colocadas con el dedo o mouse. También puedes tocar una unidad y luego una casilla. Usa ↻ para girarla.</p>
+            <ul id="fleet-pick" class="fleet-pick"></ul>
+            <div class="row wrap">
+              <button id="btn-rotate" class="btn small" type="button">↻ Horizontal</button>
+              <button id="btn-random" class="btn small" type="button">🎲 Aleatorio</button>
+              <button id="btn-clear" class="btn small ghost" type="button">Limpiar</button>
+            </div>
+            <button id="btn-ready" class="btn primary wide" type="button" disabled>¡Flota lista!</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="panel-battle" hidden aria-label="Tableros">
+        <div class="boards">
+          <div class="side" id="side-left">
+            <h2 id="cap-left"></h2>
+            <div id="board-left" class="board-wrap"></div>
+            <ul id="fleet-left" class="fleet-mini"></ul>
+            <p id="stats-left" class="muted small"></p>
+          </div>
+          <div class="side" id="side-right">
+            <h2 id="cap-right"></h2>
+            <div id="board-right" class="board-wrap"></div>
+            <ul id="fleet-right" class="fleet-mini"></ul>
+            <p id="stats-right" class="muted small"></p>
+          </div>
+        </div>
+      </section>
+
+      <section id="panel-over" class="sheet result" hidden aria-live="polite">
+        <h2 id="result-title"></h2>
+        <p id="result-reason"></p>
+        <div id="mission-result" class="mission-result" hidden></div>
+        <ul id="result-lines" class="result-lines"></ul>
+        <p id="result-note" class="muted"></p>
+        <div class="row">
+          <button id="btn-next-mission" class="btn primary" type="button" hidden>Siguiente misión →</button>
+          <button id="btn-rematch" class="btn primary" type="button">Revancha</button>
+          <button id="btn-leave-over" class="btn" type="button">Volver al inicio</button>
+        </div>
+      </section>
+
+      <div id="react-bar" class="react-bar" hidden aria-label="Reacciones"></div>
+      <div id="reactions" class="reactions" aria-hidden="true"></div>
+    </section>
+  </main>
+
+  <div id="achv-toasts" class="achv-toasts" role="status" aria-live="polite"></div>
+
+  <!-- ================= Diálogos ================= -->
+  <dialog id="mission-dialog" aria-labelledby="md-title">
+    <h2 id="md-title"></h2>
+    <p id="md-tags" class="row wrap"></p>
+    <p id="md-real" class="md-real small" hidden></p>
+    <div id="md-story" class="md-story" hidden>
+      <p id="md-scene" class="md-scene"></p>
+      <div class="row"><span id="md-page" class="muted small"></span>
+        <button id="md-listen" class="btn ghost small" type="button" hidden aria-label="Leer esta escena en voz alta">🔊 Leer</button>
+        <button id="md-next" class="btn small" type="button">Siguiente →</button></div>
+    </div>
+    <p id="md-command" class="md-command small" hidden></p>
+    <p id="md-briefing"></p>
+    <details id="md-context" class="md-context" hidden><summary>Contexto histórico y fuentes</summary><div id="md-context-body"></div></details>
+    <h3 class="small">Objetivos</h3>
+    <ul id="md-objs" class="objs"></ul>
+    <p id="md-note" class="muted small"></p>
+    <div class="row">
+      <button id="md-start" class="btn primary" type="button">Comenzar misión</button>
+      <button id="md-cancel" class="btn ghost" type="button">Cancelar</button>
+    </div>
+  </dialog>
+
+  <dialog id="achv-dialog" class="wide" aria-labelledby="ad-title">
+    <h2 id="ad-title">Logros</h2>
+    <p id="ad-sum" class="muted small"></p>
+    <div id="ad-list"></div>
+    <div class="row"><button id="ad-close" class="btn" type="button">Cerrar</button></div>
+  </dialog>
+
+  <dialog id="story-dialog" class="wide" aria-labelledby="story-title">
+    <h2 id="story-title">Datos y fuentes</h2>
+    <div id="story-body"></div>
+    <p class="muted small">Textos pensados para el aula; si vas a usarlos con estudiantes, conviene que los revise una persona de historia.</p>
+    <div class="row"><button id="story-close" class="btn" type="button">Cerrar</button></div>
+  </dialog>
+
+  <dialog id="settings-dialog" aria-labelledby="set-title">
+    <h2 id="set-title">Ajustes</h2>
+    <p id="set-anim-label" class="small">Animaciones</p>
+    <div id="set-anim" class="seg2" role="radiogroup" aria-labelledby="set-anim-label">
+      <button type="button" role="radio" data-v="full">Completas</button>
+      <button type="button" role="radio" data-v="light">Ligeras</button>
+      <button type="button" role="radio" data-v="off">Sin</button>
+    </div>
+    <p class="muted small">«Ligeras» deja solo el proyectil y el impacto (recomendado en celulares modestos). También se respeta la opción «reducir movimiento» de tu sistema.</p>
+    <label class="check"><input id="set-shake" type="checkbox"><span>Sacudir el tablero al hundir una unidad</span></label>
+    <label class="check"><input id="set-narration" type="checkbox"><span>Narración durante las misiones</span></label>
+    <label class="check"><input id="set-voice" type="checkbox"><span>Narrador militar en voz alta <small id="set-voice-note" class="muted"></small></span></label>
+    <label class="check"><input id="set-music" type="checkbox"><span>Música de fondo</span></label>
+    <label class="range" for="set-music-vol"><span>Volumen de la música</span><input id="set-music-vol" type="range" min="0" max="100" step="5"></label>
+    <p class="muted small">La música suena fuerte solo en la pantalla de entrada; dentro del juego queda suave, de fondo, y baja sola cuando se lee la narración en voz alta. El botón 🔊 silencia música y efectos a la vez.</p>
+    <label class="check"><input id="set-aula" type="checkbox"><span>Modo aula: lectura guiada antes de la misión y preguntas al ganar</span></label>
+    <div class="row"><button id="set-close" class="btn primary" type="button">Listo</button></div>
+  </dialog>
+
+  <dialog id="gallery-dialog" class="wide" aria-labelledby="gal-title">
+    <h2 id="gal-title">Láminas</h2>
+    <p id="gal-sum" class="muted small"></p>
+    <div id="gal-list"></div>
+    <div class="row wrap">
+      <button id="gal-zip" class="btn" type="button">Descargar todas (.zip)</button>
+      <button id="gal-close" class="btn" type="button">Cerrar</button>
+    </div>
+  </dialog>
+
+  <dialog id="lamina-dialog" class="wide" aria-labelledby="lam-title">
+    <h2 id="lam-title"></h2>
+    <label class="small lam-format">Formato
+      <select id="lam-format">
+        <option value="landscape">Horizontal (cuadro)</option>
+        <option value="square">Cuadrada (publicaciones)</option>
+        <option value="story">Vertical 9:16 (historias)</option>
+      </select>
+    </label>
+    <div id="lam-view" class="lam-view" aria-live="polite"></div>
+    <p id="lam-note" class="muted small"></p>
+    <div class="row wrap">
+      <button id="lam-download" class="btn primary" type="button">Descargar</button>
+      <button id="lam-share" class="btn" type="button" hidden>Compartir</button>
+      <button id="lam-close" class="btn ghost" type="button">Cerrar</button>
+    </div>
+  </dialog>
+
+  <dialog id="theme-dialog" aria-labelledby="theme-title">
+    <h2 id="theme-title">Colores y modo</h2>
+    <div id="mode-opts" class="seg2" role="radiogroup" aria-label="Modo">
+      <button type="button" role="radio" data-m="auto">Automático</button>
+      <button type="button" role="radio" data-m="light">Claro</button>
+      <button type="button" role="radio" data-m="dark">Oscuro</button>
+    </div>
+    <div id="palette-opts" class="swatches" role="radiogroup" aria-label="Paleta">
+      <button type="button" role="radio" data-p="azul" aria-label="Azul"></button>
+      <button type="button" role="radio" data-p="verde" aria-label="Verde"></button>
+      <button type="button" role="radio" data-p="morado" aria-label="Morado"></button>
+      <button type="button" role="radio" data-p="atardecer" aria-label="Atardecer"></button>
+      <button type="button" role="radio" data-p="rosa" aria-label="Rosa"></button>
+    </div>
+    <button id="theme-close" class="btn primary" type="button">Listo</button>
+  </dialog>
+</body>
+</html>

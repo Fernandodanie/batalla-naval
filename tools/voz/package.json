@@ -1,0 +1,13 @@
+{
+  "name": "batalla-naval-voz",
+  "private": true,
+  "type": "module",
+  "description": "Genera los audios de la narración con una voz neural (solo se necesita para crear los .mp3; el juego no depende de este paquete).",
+  "scripts": {
+    "prueba": "node generar.mjs --prueba",
+    "generar": "node generar.mjs"
+  },
+  "dependencies": {
+    "msedge-tts": "2.1.1"
+  }
+}

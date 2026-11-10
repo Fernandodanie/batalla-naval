@@ -1,0 +1,20 @@
+name: Enlaces de fuentes
+
+# Comprueba cada semana que los enlaces de las fuentes históricas sigan respondiendo.
+on:
+  schedule:
+    - cron: '0 12 * * 1'
+  workflow_dispatch:
+
+jobs:
+  enlaces:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --prefix backend
+      - name: Comprobar enlaces (un 403/429 suele ser un bloqueo a robots; revísalo a mano antes de quitarlo)
+        run: npm run check:links --prefix backend

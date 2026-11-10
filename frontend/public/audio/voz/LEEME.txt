@@ -1,0 +1,4 @@
+Esta carpeta admite 191 pistas de voz neural. No se incluyen MP3 de narracion
+porque no habia grabaciones en los ZIP y no se pudo generar voz neural sin
+conectividad al servicio. Mientras tanto funciona la voz en espanol del
+navegador (Ajustes > Voz del narrador). Para crear los MP3 ver tools/voz/LEEME.md.

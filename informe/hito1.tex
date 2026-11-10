@@ -1,0 +1,50 @@
+%% Hito 1 — Perfil técnico (1 página). Compilar: latexmk -pdf hito1.tex
+\documentclass[conference]{IEEEtran}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-tabla,es-nodecimaldot]{babel}
+\usepackage{amsmath,amssymb,booktabs,xcolor,cite}
+\usepackage[hidelinks]{hyperref}
+\newcommand{\TODO}[1]{\textcolor{red}{\textbf{[#1]}}}
+\begin{document}
+\title{Hito 1 --- Perfil t\'ecnico: motor Monte Carlo paralelo (MPI + OpenMP) sobre un cl\'uster de PCs de laboratorio en Yacuiba}
+\author{\IEEEauthorblockN{Fernando Daniel Cruz Zarate}
+\IEEEauthorblockA{Ingenier\'ia Inform\'atica, UAJMS, Yacuiba, Bolivia --- Sistemas Paralelos y Distribuidos}}
+\maketitle
+\vspace{-1.2em}
+\section{Problema regional}
+Yacuiba (provincia Gran Chaco, Tarija) est\'a a unos 3\,km de la frontera con Argentina; el Censo 2012 registr\'o 147\,478 habitantes en la provincia, con un crecimiento de 26,79\,\% desde 2001 \cite{ine2014}, y su econom\'ia se apoya en el comercio fronterizo y los hidrocarburos \cite{bcb2015}. La UAJMS dicta Ingenier\'ia Inform\'atica en Yacuiba. Ense\~nar y practicar c\'omputo paralelo exige equipos multin\'ucleo y cl\'usteres, cuyo costo puede ser una barrera; en cambio, los PCs Dell OptiPlex del laboratorio, interconectados, pueden formar un \textbf{cl\'uster de bajo costo}. Se propone una aplicaci\'on concreta y medible que sirva como \textbf{plataforma did\'actica} y banco de pruebas de simulaci\'on: un juego de Batalla Naval cuya IA estima probabilidades por Monte Carlo \cite{metropolis1949}. \emph{Es un prototipo acad\'emico; no se afirma adopci\'on institucional} \TODO{citar constancia si existe}.
+
+\section{Objetivo}
+Acelerar la simulaci\'on Monte Carlo del motor de IA con MPI + OpenMP en un cl\'uster de $\TODO{n}$ OptiPlex, medir aceleraci\'on y eficiencia y contrastarlas con las leyes de Amdahl y Gustafson.
+
+\section{Modelo matem\'atico}
+Para un tablero se generan $N$ flotas aleatorias compatibles con lo observado; la probabilidad de la casilla $i$ es $\hat p_i=\frac1{N_v}\sum_s\mathbf 1[i\in F_s]$, con error $O(1/\sqrt{N_v})$: cuadruplicar el c\'omputo reduce el error a la mitad. Las muestras son independientes (problema \emph{embarazosamente paralelo}); el tiempo con $p=r\cdot t$ unidades ($r$ procesos MPI, $t$ hilos) es
+\[
+T_p \approx T_{\mathrm{ser}}+\frac{T_{\mathrm{par}}}{p}+\lceil\log_2 r\rceil\Big(\alpha+\frac{4n^2}{\beta}\Big),
+\]
+con latencia $\alpha$, ancho de banda $\beta$ y $4n^2$ bytes por mensaje (independiente de $N$). M\'etricas: $S=T_1/T_p$, $E=S/p$, Amdahl $S\le 1/(f+\frac{1-f}{p})$ \cite{amdahl1967}, Gustafson $S_G=p-\alpha_G(p-1)$ \cite{gustafson1988} y Karp--Flatt para estimar $f$.
+
+\section{Arquitectura de cl\'uster a desplegar}
+\emph{Modelo:} MIMD/SPMD, memoria \textbf{h\'ibrida} (OpenMP dentro de cada equipo, MPI entre equipos), red Ethernet conmutada en estrella. \emph{Reparto:} un proceso MPI por equipo con tantos hilos como n\'ucleos; las $N$ muestras se cortan en $r\cdot t$ trozos independientes con semillas derivadas y una reducci\'on final (\texttt{MPI\_Reduce}). \emph{Capa de aplicaci\'on:} backend, base de datos y nodos de IA en contenedores (\texttt{docker compose}).
+
+\begin{center}\scriptsize
+\begin{tabular}{@{}llccl@{}}
+\toprule Equipo & CPU & N\'uc. & RAM & Rol\\\midrule
+OptiPlex 1 & \TODO{modelo} & \TODO{n} & \TODO{GB} & maestro (rank 0) + contenedores\\
+OptiPlex 2--\TODO{k} & \TODO{modelo} & \TODO{n} & \TODO{GB} & trabajadores (rank 1\ldots)\\\bottomrule
+\end{tabular}\\[2pt]
+Switch \TODO{marca, velocidad}; SO \TODO{distribuci\'on}; OpenMPI \TODO{versi\'on}.
+\end{center}
+
+\section{Plan de validaci\'on}
+Correcci\'on: las versiones Node.js, C + OpenMP y C + MPI + OpenMP ya producen id\'entico resultado (suma de control) en las pruebas realizadas. Rendimiento: escalabilidad fuerte y d\'ebil con $p=1,2,4,\dots$, mediana de repeticiones, tiempo de c\'omputo y de comunicaci\'on por separado, y an\'alisis de cuellos de botella. Entregable A: informe IEEE (m\'ax.\ 10 p\'ag.).
+
+\begin{thebibliography}{9}\scriptsize
+\bibitem{ine2014} INE (Bolivia), ``La poblaci\'on de la provincia Gran Chaco creci\'o en 26,79\,\% entre los Censos 2001 y 2012,'' Tarija, 2014.
+\bibitem{bcb2015} Banco Central de Bolivia, ``Memoria del VIII Concurso de Ensayo Escolar,'' 2015.
+\bibitem{metropolis1949} N. Metropolis and S. Ulam, ``The Monte Carlo method,'' \emph{J. Amer. Statist. Assoc.}, vol.~44, no.~247, pp.~335--341, 1949.
+\bibitem{amdahl1967} G. M. Amdahl, ``Validity of the single processor approach\ldots,'' in \emph{Proc. AFIPS SJCC}, 1967, pp.~483--485.
+\bibitem{gustafson1988} J. L. Gustafson, ``Reevaluating Amdahl's law,'' \emph{Commun. ACM}, vol.~31, no.~5, pp.~532--533, 1988.
+\end{thebibliography}
+\end{document}
