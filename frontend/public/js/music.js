@@ -22,9 +22,9 @@ import { sound } from './sound.js';
 
 /** Pistas: archivo, volumen base (0–1) y segundos de fundido de entrada cuando no hay otra sonando. */
 export const TRACKS = Object.freeze({
-  login:   { src: 'audio/tambores-guerra.mp3',  gain: 0.5,   fadeIn: 2.5, releaseBuffer: true },
-  puerto:  { src: 'audio/ambiente-puerto.mp3',  gain: 0.11,  fadeIn: 4.0, releaseBuffer: false },
-  batalla: { src: 'audio/ambiente-batalla.mp3', gain: 0.075, fadeIn: 3.0, releaseBuffer: false },
+  login:   { src: 'audio/tambores-guerra.mp3',  gain: 0.5,   fadeIn: 0.35, releaseBuffer: true },
+  puerto:  { src: 'audio/ambiente-puerto.mp3',  gain: 0.11,  fadeIn: 4.0,  releaseBuffer: false },
+  batalla: { src: 'audio/ambiente-batalla.mp3', gain: 0.075, fadeIn: 3.0,  releaseBuffer: false },
 });
 
 /** Qué pista corresponde a cada pantalla (`showScreen` en main.js). */

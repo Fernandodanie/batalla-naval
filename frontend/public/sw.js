@@ -8,7 +8,7 @@
  * Al cambiar archivos del frontend, sube VERSION (así se renueva la caché) y revisa que SHELL los incluya:
  * la prueba frontend/test/sw.test.js falla si falta alguno.
  */
-const VERSION = 'bn-0.9.6-pulido-visual-voz';
+const VERSION = 'bn-0.9.6-pulido-visual-voz-v2';
 const SHELL_CACHE = `${VERSION}-shell`;
 const API_CACHE = `${VERSION}-api`;
 

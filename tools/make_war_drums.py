@@ -71,29 +71,30 @@ def render_loop():
         section = bar // 4
         # ---- tambor grande: latido (siempre)
         hit(0.5, b0, big, 1.0)
+        # Golpe de apoyo en el compás desde el inicio
+        hit(0.5, b0 + BEAT * 2.5, big, 0.85)
+
+        # ---- patrón de marcha activo desde el inicio: DUM . . dum dum . DUM .
+        for k, (pos, v, f, p) in enumerate([
+            (1.0, 0.55, mid, 0.40), (1.5, 0.45, small, 0.62),
+            (3.0, 0.60, mid, 0.40), (3.5, 0.50, small, 0.62),
+        ]):
+            hit(p, b0 + BEAT * pos, f, v, 0.7, 0.6)
+
         if section >= 1:
-            hit(0.5, b0 + BEAT * 2.5, big, 0.85)
-        # ---- patrón de marcha: DUM . . dum dum . DUM .
-        if section >= 1:
-            for k, (pos, v, f, p) in enumerate([
-                (1.0, 0.55, mid, 0.40), (1.5, 0.45, small, 0.62),
-                (3.0, 0.60, mid, 0.40), (3.5, 0.50, small, 0.62),
-            ]):
-                hit(p, b0 + BEAT * pos, f, v, 0.7, 0.6)
-        if section >= 2:
             for pos in (0.5, 2.0, 3.75):
                 hit(0.55, b0 + BEAT * pos, small * 1.18, 0.38, 0.5, 0.7)
-        # ---- redoble de caja suave (corcheas) desde la sección 1
-        if section >= 1:
-            vel_roll = 0.10 if section == 1 else 0.16
-            for s in range(8):
-                t = b0 + BEAT * (s * 0.5) + BEAT * 0.25
-                n_s = int(0.09 * SR)
-                nz = bandpass(rng.standard_normal(n_s), 1800, 7500) * env_exp(n_s, 0.022)
-                a = vel_roll * (1.4 if s % 2 == 0 else 0.8)
-                pan = 0.35 if s % 2 == 0 else 0.65
-                place(L, nz * a * (1 - pan) ** 0.5, t)
-                place(R, nz * a * pan ** 0.5, t)
+
+        # ---- redoble de caja suave (corcheas) presente desde el compás 1
+        vel_roll = 0.12 if section == 0 else (0.15 if section == 1 else 0.18)
+        for s in range(8):
+            t = b0 + BEAT * (s * 0.5) + BEAT * 0.25
+            n_s = int(0.09 * SR)
+            nz = bandpass(rng.standard_normal(n_s), 1800, 7500) * env_exp(n_s, 0.022)
+            a = vel_roll * (1.4 if s % 2 == 0 else 0.8)
+            pan = 0.35 if s % 2 == 0 else 0.65
+            place(L, nz * a * (1 - pan) ** 0.5, t)
+            place(R, nz * a * pan ** 0.5, t)
         # ---- relleno al final de cada frase de 4 compases
         if bar % 4 == 3:
             for k in range(6):
