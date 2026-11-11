@@ -1,0 +1,75 @@
+# Batalla Naval - despliegue en el VPS compartido (Hostinger, acceso por IP y puerto).
+#
+# Se ejecuta SIEMPRE con el identificador de proyecto (aisla redes, volumenes y contenedores de los demas companeros):
+#   docker compose -p daniel-batalla-naval -f docker-compose.vps.yml --env-file .env config   # validar
+#   docker compose -p daniel-batalla-naval -f docker-compose.vps.yml --env-file .env up -d --build
+#
+# Notas de diseno:
+#  - El frontend (nginx) ya reenvia /api y /ws al backend por la red interna de Docker, asi que el navegador solo habla con
+#    el puerto 8085 (mismo origen, sin CORS y SIN variables de build como VITE_API_URL: no hace falta recompilar por cambios de .env,
+#    salvo que cambies archivos del frontend, que si requieren --build).
+#  - El backend NO se publica al exterior. Se enlaza solo a 127.0.0.1:3005 del VPS para poder diagnosticar con curl desde el propio servidor.
+#  - La base de datos NO publica ningun puerto (la API llega a ella por la red interna, host "db").
+#  - Sin container_name fijos y sin montar docker.sock, /, /etc ni carpetas ajenas.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    # Sin "user:": la imagen oficial de PostgreSQL prepara su carpeta de datos y luego baja privilegios por si misma.
+    # Consecuencia: ./db-data quedara con el UID interno de postgres (no se podra borrar sin docker). Es lo esperado.
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-naval}
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Falta POSTGRES_PASSWORD en .env}"
+      POSTGRES_DB: ${POSTGRES_DB:-naval}
+    volumes:
+      - ./db-data:/var/lib/postgresql/data
+    mem_limit: 768m
+    cpus: 1.0
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    # Mismo UID/GID que tu usuario del VPS (APP_UID / APP_GID en .env). Si el backend no arrancara por permisos,
+    # quita esta linea: la imagen ya corre como usuario no-root ("node").
+    user: "${APP_UID:?Falta APP_UID en .env (id -u)}:${APP_GID:?Falta APP_GID en .env (id -g)}"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      HOST: 0.0.0.0                      # escuchar en todas las interfaces DEL CONTENEDOR (no en localhost)
+      HOME: /tmp                         # con un UID arbitrario, npx/prisma necesitan un HOME escribible
+      npm_config_cache: /tmp/.npm
+      NODE_OPTIONS: --max-old-space-size=512   # el heap de Node debe caber dentro de mem_limit (768m)
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-naval}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-naval}?schema=public"
+      JWT_SECRET: "${JWT_SECRET:?Falta JWT_SECRET en .env}"
+      AI_WORKERS: ${AI_WORKERS:-1}       # cpus: 1.0 -> 1 hilo de IA (Node ve los nucleos del VPS, no el limite del contenedor)
+      MC_SAMPLES: ${MC_SAMPLES:-20000}
+      MC_MODE: ${MC_MODE:-shared}
+      PARALLEL_MIN_COST: ${PARALLEL_MIN_COST:-100000}
+      GUEST_AI_DAILY: ${GUEST_AI_DAILY:-10}
+      AUTH_PER_MINUTE: ${AUTH_PER_MINUTE:-60}   # varios jugadores comparten IP: limite mas alto que el predeterminado
+      QUIZ_PER_MINUTE: ${QUIZ_PER_MINUTE:-120}
+      TURN_SECONDS: ${TURN_SECONDS:-30}
+      PLACEMENT_SECONDS: ${PLACEMENT_SECONDS:-90}
+    ports:
+      - "127.0.0.1:3005:4000"            # solo accesible desde el propio VPS (diagnostico); no se publica a internet
+    mem_limit: 768m
+    cpus: 1.0
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8085:80"                        # http://187.41.117.126:8085
+    mem_limit: 256m
+    cpus: 0.5
