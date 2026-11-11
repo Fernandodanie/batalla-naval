@@ -158,8 +158,8 @@ function speakSynth(clean) {
     if (v) u.voice = v;
     // Un oficial transmite serenidad y autoridad, no un efecto de voz artificial.
     // Las voces neurales ya tienen sus propias curvas de entonación.
-    u.rate = natural ? 0.99 : 0.96;
-    u.pitch = natural ? 1 : (male ? 0.96 : 0.98);
+    u.rate = 1.1;
+    u.pitch = natural ? 1 : (male ? 0.96 : 0.8);
     u.volume = 1;
     u.onstart = () => { if (current === token && !token.started) { token.started = true; emit(true); } };
     u.onend = () => { if (current === token) next(); };
