@@ -59,3 +59,21 @@ docker compose -p daniel-batalla-naval -f docker-compose.vps.yml --env-file .env
   ```
 - **Acceso público**:
   - Web y WebSocket: `http://187.41.117.126:8085`
+
+---
+
+## Copias de seguridad (Backup de la Base de Datos)
+
+- **Crear un respaldo manual**:
+  ```bash
+  mkdir -p /opt/proyectos/daniel/backups
+  cd /opt/proyectos/daniel/batalla-naval
+  docker compose -p daniel-batalla-naval -f docker-compose.vps.yml --env-file .env exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > /opt/proyectos/daniel/backups/naval-$(date +%F).sql
+  ```
+
+- **Restaurar un respaldo**:
+  ```bash
+  cat /opt/proyectos/daniel/backups/naval-YYYY-MM-DD.sql | docker compose -p daniel-batalla-naval -f docker-compose.vps.yml --env-file .env exec -T db sh -c 'psql -U "$POSTGRES_USER" "$POSTGRES_DB"'
+  ```
+
+
